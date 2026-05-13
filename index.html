@@ -36,6 +36,7 @@
             height: 100%;
             object-fit: cover;
             opacity: 0.8;
+            transform: scaleX(-1); /* Memperbaiki tampilan mirror */
         }
 
         canvas#overlay {
@@ -46,6 +47,7 @@
             height: 100%;
             pointer-events: none;
             z-index: 10;
+            transform: scaleX(-1); /* Menyesuaikan canvas dengan video mirror */
         }
 
         /* UI Elements */
@@ -68,6 +70,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 24px;
             font-family: 'JetBrains Mono', monospace;
+            transition: all 0.3s ease;
         }
 
         .scan-line {
@@ -161,14 +164,20 @@
 
         <!-- Real-time Stats Overlay -->
         <div class="absolute left-6 top-24 z-30 space-y-4">
-            <div class="data-panel p-4 w-48">
-                <p class="text-[10px] text-white/40 mb-2">HAND TRACKER</p>
-                <div class="flex justify-between items-end">
-                    <span class="text-3xl font-bold text-[#FFB800]" id="fingerCount">0</span>
-                    <span class="text-[10px] mb-1" id="handSide">DETECTING...</span>
+            <div class="data-panel p-4 w-56">
+                <p class="text-[10px] text-white/40 mb-2">NEURAL HAND TRACKER</p>
+                <div class="flex justify-between items-end mb-1">
+                    <span class="text-4xl font-bold text-[#FFB800]" id="fingerCount">0</span>
+                    <div class="text-right">
+                        <span class="text-[9px] block text-white/60" id="handSide">WAITING...</span>
+                        <span class="text-[9px] block text-[#FFB800]" id="handCount">0 HANDS</span>
+                    </div>
                 </div>
-                <div class="mt-2 h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                    <div id="confidenceBar" class="h-full bg-[#FFB800]" style="width: 0%"></div>
+                <div class="mt-2 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div id="confidenceBar" class="h-full bg-[#FFB800] transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="multiHandDetail" class="mt-3 space-y-1 border-t border-white/5 pt-2 hidden">
+                    <!-- Dynamic hand details here -->
                 </div>
             </div>
 
@@ -247,6 +256,9 @@
         const ctx = canvas.getContext('2d');
         const fingerCountEl = document.getElementById('fingerCount');
         const handSideEl = document.getElementById('handSide');
+        const handCountEl = document.getElementById('handCount');
+        const confidenceBar = document.getElementById('confidenceBar');
+        const multiHandDetail = document.getElementById('multiHandDetail');
         const modelStatusEl = document.getElementById('modelStatus');
         const scanLine = document.getElementById('scanLine');
         const analysisCard = document.getElementById('analysisCard');
@@ -298,15 +310,14 @@
             modelStatusEl.innerText = "Initializing AI Engine...";
             
             try {
-                // Hands Setup - Using lower complexity to avoid WebGL crashes
                 hands = new Hands({
                     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
                 });
                 hands.setOptions({
-                    maxNumHands: 1,
-                    modelComplexity: 0, // Lowered for stability
-                    minDetectionConfidence: 0.6,
-                    minTrackingConfidence: 0.6
+                    maxNumHands: 2, // Mengaktifkan deteksi 2 tangan
+                    modelComplexity: 0, 
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
                 });
                 hands.onResults(onHandResults);
 
@@ -343,48 +354,62 @@
         function onHandResults(results) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            let totalFingers = 0;
+            let activeHands = [];
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                const handedness = results.multiHandedness[0].label; // 'Left' or 'Right'
+                multiHandDetail.innerHTML = '';
+                multiHandDetail.classList.remove('hidden');
                 
-                lastHandData = landmarks;
-                handSideEl.innerText = handedness === 'Left' ? 'TANGAN KIRI' : 'TANGAN KANAN';
-                
-                // Finger Counting Logic
-                let count = 0;
-                // Index, Middle, Ring, Pinky
-                const fingerTips = [8, 12, 16, 20];
-                const fingerBases = [6, 10, 14, 18];
-                
-                fingerTips.forEach((tip, idx) => {
-                    if (landmarks[tip].y < landmarks[fingerBases[idx]].y) count++;
+                results.multiHandLandmarks.forEach((landmarks, index) => {
+                    const handedness = results.multiHandedness[index].label;
+                    const score = results.multiHandedness[index].score;
+                    
+                    // Deteksi Jari
+                    let count = 0;
+                    const fingerTips = [8, 12, 16, 20];
+                    const fingerBases = [6, 10, 14, 18];
+                    
+                    fingerTips.forEach((tip, idx) => {
+                        if (landmarks[tip].y < landmarks[fingerBases[idx]].y) count++;
+                    });
+
+                    // Jempol (Karena mirror, logika X harus dibalik atau disesuaikan)
+                    // MediaPipe mendeteksi label 'Left'/'Right' berdasarkan orientasi aslinya
+                    const thumbTip = landmarks[4];
+                    const thumbBase = landmarks[2];
+                    if (handedness === 'Left') {
+                        if (thumbTip.x > thumbBase.x) count++;
+                    } else {
+                        if (thumbTip.x < thumbBase.x) count++;
+                    }
+
+                    totalFingers += count;
+                    activeHands.push(handedness);
+
+                    // Render UI Detail Kecil
+                    const handInfo = document.createElement('div');
+                    handInfo.className = "flex justify-between text-[10px]";
+                    handInfo.innerHTML = `<span>${handedness === 'Left' ? 'KIRI' : 'KANAN'}</span> <span class="text-[#FFB800]">${count} Jari</span>`;
+                    multiHandDetail.appendChild(handInfo);
+
+                    // Gambar di Canvas
+                    drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: index === 0 ? '#FFB800' : '#00E5FF', lineWidth: 3 });
+                    drawLandmarks(ctx, landmarks, { color: '#FFFFFF', lineWidth: 1, radius: 4 });
                 });
 
-                // Thumb Logic (special case)
-                // Thumb is open if tip x is further from palm center than base x
-                const thumbTip = landmarks[4];
-                const thumbBase = landmarks[2];
-                if (handedness === 'Left') {
-                    if (thumbTip.x > thumbBase.x) count++;
-                } else {
-                    if (thumbTip.x < thumbBase.x) count++;
-                }
+                // Update UI Utama
+                fingerCountEl.innerText = totalFingers;
+                handCountEl.innerText = `${results.multiHandLandmarks.length} TANGAN`;
+                handSideEl.innerText = activeHands.join(' + ');
+                confidenceBar.style.width = (results.multiHandedness[0].score * 100) + '%';
 
-                fingerCountEl.innerText = count;
-                document.getElementById('confidenceBar').style.width = (results.multiHandedness[0].score * 100) + '%';
-
-                // Draw Landmarks
-                drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: '#FFB800', lineWidth: 2 });
-                drawLandmarks(ctx, landmarks, { color: '#FFFFFF', lineWidth: 1, radius: 3 });
-                
-                // Smart Label for Hand
-                ctx.fillStyle = '#FFB800';
-                ctx.font = 'bold 20px JetBrains Mono';
-                ctx.fillText(`${handedness} Hand (${count} Fingers)`, landmarks[0].x * canvas.width, (landmarks[0].y * canvas.height) + 30);
             } else {
                 fingerCountEl.innerText = "0";
-                handSideEl.innerText = "DETECTING...";
-                document.getElementById('confidenceBar').style.width = '0%';
+                handCountEl.innerText = "0 TANGAN";
+                handSideEl.innerText = "WAITING...";
+                confidenceBar.style.width = '0%';
+                multiHandDetail.classList.add('hidden');
             }
         }
 
