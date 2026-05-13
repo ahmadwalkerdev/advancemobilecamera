@@ -112,11 +112,33 @@
         }
 
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Error Notification UI */
+        #errorOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
     <div class="ai-container">
+        <!-- Error Overlay -->
+        <div id="errorOverlay">
+            <i data-lucide="alert-triangle" class="w-16 h-16 text-red-500 mb-4"></i>
+            <h2 class="text-xl font-bold mb-2">Graphics Engine Error</h2>
+            <p id="errorMessage" class="text-sm text-white/60 mb-6">WebGL tidak terdeteksi atau diblokir oleh sistem.</p>
+            <button onclick="location.reload()" class="bg-[#FFB800] text-black px-6 py-2 rounded-full font-bold">RESTART SYSTEM</button>
+        </div>
+
         <!-- Video & Canvas -->
         <video id="webcam" autoplay playsinline></video>
         <canvas id="overlay"></canvas>
@@ -228,12 +250,29 @@
         const modelStatusEl = document.getElementById('modelStatus');
         const scanLine = document.getElementById('scanLine');
         const analysisCard = document.getElementById('analysisCard');
+        const errorOverlay = document.getElementById('errorOverlay');
+        const errorMessage = document.getElementById('errorMessage');
 
         let hands, faceDetection;
         let lastHandData = null;
         let isAnalyzing = false;
 
+        // Function to check WebGL availability
+        function isWebGLAvailable() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+            } catch (e) {
+                return false;
+            }
+        }
+
         async function initCamera() {
+            if (!isWebGLAvailable()) {
+                showError("Hardware Acceleration (WebGL) tidak aktif. Silakan aktifkan di pengaturan browser.");
+                return;
+            }
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: 'user', width: 1280, height: 720 } 
@@ -250,36 +289,53 @@
             }
         }
 
+        function showError(msg) {
+            errorMessage.innerText = msg;
+            errorOverlay.style.display = 'flex';
+        }
+
         async function startTracking() {
-            modelStatusEl.innerText = "Loading AI Models...";
+            modelStatusEl.innerText = "Initializing AI Engine...";
             
-            // Hands Setup
-            hands = new Hands({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-            });
-            hands.setOptions({
-                maxNumHands: 1,
-                modelComplexity: 1,
-                minDetectionConfidence: 0.7,
-                minTrackingConfidence: 0.7
-            });
-            hands.onResults(onHandResults);
+            try {
+                // Hands Setup - Using lower complexity to avoid WebGL crashes
+                hands = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                });
+                hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 0, // Lowered for stability
+                    minDetectionConfidence: 0.6,
+                    minTrackingConfidence: 0.6
+                });
+                hands.onResults(onHandResults);
 
-            // Face Setup
-            faceDetection = new FaceDetection({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
-            });
-            faceDetection.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
-            faceDetection.onResults(onFaceResults);
+                // Face Setup
+                faceDetection = new FaceDetection({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+                });
+                faceDetection.setOptions({ 
+                    model: 'short', 
+                    minDetectionConfidence: 0.5 
+                });
+                faceDetection.onResults(onFaceResults);
 
-            modelStatusEl.innerText = "Engines Ready";
-            requestAnimationFrame(processFrame);
+                modelStatusEl.innerText = "Neural Engine Active";
+                requestAnimationFrame(processFrame);
+            } catch (err) {
+                console.error("AI Init Error:", err);
+                showError("Gagal memuat modul AI. Pastikan koneksi internet stabil dan WebGL aktif.");
+            }
         }
 
         async function processFrame() {
-            if (!video.paused) {
-                await hands.send({ image: video });
-                await faceDetection.send({ image: video });
+            if (!video.paused && video.readyState >= 2) {
+                try {
+                    await hands.send({ image: video });
+                    await faceDetection.send({ image: video });
+                } catch (err) {
+                    console.warn("Frame processing skipped due to WebGL pressure:", err);
+                }
             }
             requestAnimationFrame(processFrame);
         }
