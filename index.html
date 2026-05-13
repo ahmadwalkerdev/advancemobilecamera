@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vivo V60 Ultra Camera - Advanced</title>
+    <title>Vivo AI Smart Vision - V60 Pro Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MediaPipe for Face and Hand tracking -->
+    <!-- MediaPipe Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
@@ -13,40 +13,29 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap');
         
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #000;
-            color: white;
+            background-color: #050505;
+            color: #fff;
             overflow: hidden;
             margin: 0;
             height: 100vh;
-            touch-action: none;
         }
 
-        .camera-container {
+        .ai-container {
             position: relative;
             width: 100%;
             height: 100vh;
             background: #000;
-            overflow: hidden;
-        }
-
-        #video-container {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
         }
 
         video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.1s ease-out;
+            opacity: 0.8;
         }
 
         canvas#overlay {
@@ -59,264 +48,173 @@
             z-index: 10;
         }
 
-        .zoom-dial-wrapper {
-            position: absolute;
-            bottom: 220px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 300px;
-            height: 80px;
-            overflow: hidden;
-            mask-image: linear-gradient(to right, transparent, black 20%, black 80%, transparent);
-            -webkit-mask-image: linear-gradient(to right, transparent, black 20%, black 80%, transparent);
-            z-index: 40;
-        }
-
-        #zoomDial {
-            display: flex;
-            align-items: flex-end;
-            gap: 15px;
-            padding: 0 150px;
-            height: 100%;
-            transition: transform 0.1s ease-out;
-            cursor: grab;
-        }
-
-        .dial-tick {
-            min-width: 2px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.4);
-            flex-shrink: 0;
-        }
-
-        .dial-tick.major {
-            height: 35px;
-            background: white;
-            position: relative;
-        }
-
-        .dial-tick.major::after {
-            content: attr(data-value);
-            position: absolute;
-            top: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 10px;
-            color: white;
-        }
-
-        .zoom-indicator {
-            position: absolute;
-            bottom: 215px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 3px;
-            height: 50px;
-            background: #FFB800;
-            z-index: 45;
-            box-shadow: 0 0 10px rgba(255, 184, 0, 0.5);
-        }
-
-        .shutter-btn {
-            width: 76px;
-            height: 76px;
-            border-radius: 50%;
-            border: 4px solid white;
-            background: transparent;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .shutter-inner {
-            width: 60px;
-            height: 60px;
-            background: white;
-            border-radius: 50%;
-            transition: transform 0.1s;
-        }
-
-        .mode-item {
-            padding: 8px 12px;
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            color: rgba(255,255,255,0.5);
-            transition: 0.3s;
-        }
-
-        .mode-item.active {
+        /* UI Elements */
+        .status-badge {
+            background: rgba(255, 184, 0, 0.15);
+            border: 1px solid rgba(255, 184, 0, 0.3);
             color: #FFB800;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            backdrop-filter: blur(5px);
         }
 
-        /* Settings Panel Styling */
-        #settingsPanel {
-            transform: translateY(100%);
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        .data-panel {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        #settingsPanel.open {
-            transform: translateY(0);
-        }
-
-        .finger-tracker {
+        .scan-line {
             position: absolute;
-            width: 40px;
-            height: 40px;
-            border: 2px solid #FFB800;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #FFB800, transparent);
+            top: 0;
+            z-index: 15;
+            box-shadow: 0 0 15px #FFB800;
             display: none;
-            z-index: 20;
-            pointer-events: none;
         }
 
-        .finger-tracker::before, .finger-tracker::after {
-            content: '';
-            position: absolute;
-            background: #FFB800;
+        .animate-scan {
+            display: block;
+            animation: scan 2s linear infinite;
         }
 
-        .finger-tracker::before { width: 100%; height: 1px; top: 50%; left: 0; }
-        .finger-tracker::after { height: 100%; width: 1px; left: 50%; top: 0; }
-
-        .flash-overlay {
-            position: absolute;
-            inset: 0;
-            background: white;
-            opacity: 0;
-            z-index: 100;
-            pointer-events: none;
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
         }
-        
-        .animate-flash { animation: flash 0.3s ease-out; }
-        @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 
-        .glass { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px); }
+        .shutter-glow {
+            box-shadow: 0 0 20px rgba(255, 184, 0, 0.4);
+        }
+
+        /* Result Card */
+        #analysisCard {
+            transform: translateY(120%);
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #analysisCard.show { transform: translateY(0); }
+
+        .loading-spinner {
+            border: 3px solid rgba(255, 184, 0, 0.1);
+            border-top: 3px solid #FFB800;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <div class="camera-container">
-        <div id="video-container">
-            <video id="webcam" autoplay playsinline></video>
-        </div>
+    <div class="ai-container">
+        <!-- Video & Canvas -->
+        <video id="webcam" autoplay playsinline></video>
         <canvas id="overlay"></canvas>
-        <div id="fingerTracker" class="finger-tracker"></div>
-        <div id="flashOverlay" class="flash-overlay"></div>
+        <div id="scanLine" class="scan-line"></div>
 
-        <!-- Top Navigation -->
-        <div class="absolute top-0 left-0 w-full p-5 flex justify-between items-center z-30">
-            <button onclick="toggleSettings()" class="p-2"><i data-lucide="settings" class="w-6 h-6"></i></button>
-            <div class="flex gap-8 items-center bg-black/20 px-4 py-2 rounded-full backdrop-blur-md">
-                <button id="flashToggle" onclick="cycleFlash()"><i data-lucide="zap-off" class="w-5 h-5"></i></button>
-                <div class="w-[1px] h-4 bg-white/20"></div>
-                <button id="gestureToggle" onclick="toggleGesture()" class="flex flex-col items-center">
-                    <i data-lucide="hand" class="w-5 h-5"></i>
-                    <span class="text-[7px] font-bold mt-1">GESTURE</span>
-                </button>
-                <div class="w-[1px] h-4 bg-white/20"></div>
-                <button id="timerToggle" onclick="cycleTimer()" class="relative">
-                    <i data-lucide="timer" class="w-5 h-5"></i>
-                    <span id="timerVal" class="text-[7px] font-bold absolute -bottom-3 left-1/2 -translate-x-1/2">OFF</span>
-                </button>
-            </div>
-            <div class="w-10"></div>
-        </div>
-
-        <!-- Zoom Dial (Vivo Style) -->
-        <div class="absolute bottom-[310px] left-1/2 -translate-x-1/2 text-center z-30">
-            <span id="zoomLabel" class="text-[#FFB800] text-sm font-bold bg-black/40 px-3 py-1 rounded-full border border-white/10">1.0x</span>
-        </div>
-        
-        <div class="zoom-indicator"></div>
-        <div class="zoom-dial-wrapper" id="dialTouchArea">
-            <div id="zoomDial">
-                <!-- Ticks will be generated by JS -->
-            </div>
-        </div>
-
-        <!-- Bottom UI -->
-        <div class="absolute bottom-0 left-0 w-full z-30 pb-8 glass rounded-t-[40px]">
-            <!-- Mode Selector -->
-            <div class="flex overflow-x-auto justify-center items-center py-4 px-2 gap-2 scrollbar-hide">
-                <div class="mode-item" onclick="setMode('NIGHT')">NIGHT</div>
-                <div class="mode-item" onclick="setMode('PORTRAIT')">PORTRAIT</div>
-                <div class="mode-item active" onclick="setMode('PHOTO')">PHOTO</div>
-                <div class="mode-item" onclick="setMode('VIDEO')">VIDEO</div>
-                <div class="mode-item" onclick="setMode('PRO')">PRO</div>
-            </div>
-
-            <div class="px-10 flex justify-between items-center mt-2">
-                <!-- Gallery -->
-                <div class="w-14 h-14 rounded-full border-2 border-white/20 overflow-hidden bg-zinc-800" onclick="openGallery()">
-                    <img id="galleryThumb" src="https://placehold.co/100x100/333/fff?text=IMG" class="w-full h-full object-cover">
+        <!-- Top Header -->
+        <div class="absolute top-0 left-0 w-full p-6 flex justify-between items-start z-30">
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                    <span class="text-xs font-bold tracking-widest text-white/70">AI LIVE FEED</span>
                 </div>
+                <div class="status-badge" id="modelStatus">Initializing Engine...</div>
+            </div>
+            
+            <button onclick="toggleSettings()" class="bg-white/10 p-3 rounded-full backdrop-blur-md">
+                <i data-lucide="cpu" class="w-6 h-6 text-[#FFB800]"></i>
+            </button>
+        </div>
 
-                <!-- Shutter -->
-                <button class="shutter-btn" onclick="triggerCapture()">
-                    <div id="shutterInner" class="shutter-inner"></div>
-                </button>
+        <!-- Real-time Stats Overlay -->
+        <div class="absolute left-6 top-24 z-30 space-y-4">
+            <div class="data-panel p-4 w-48">
+                <p class="text-[10px] text-white/40 mb-2">HAND TRACKER</p>
+                <div class="flex justify-between items-end">
+                    <span class="text-3xl font-bold text-[#FFB800]" id="fingerCount">0</span>
+                    <span class="text-[10px] mb-1" id="handSide">DETECTING...</span>
+                </div>
+                <div class="mt-2 h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div id="confidenceBar" class="h-full bg-[#FFB800]" style="width: 0%"></div>
+                </div>
+            </div>
 
-                <!-- Switch Camera -->
-                <button class="w-14 h-14 flex items-center justify-center bg-white/10 rounded-full" onclick="switchCamera()">
-                    <i data-lucide="refresh-cw" class="w-7 h-7"></i>
-                </button>
+            <div class="data-panel p-4 w-48">
+                <p class="text-[10px] text-white/40 mb-2">FACE METRICS</p>
+                <div id="faceStatus" class="text-xs font-bold">NO SUBJECT</div>
+                <div class="flex gap-1 mt-2">
+                    <div class="w-full h-8 bg-white/5 rounded flex items-center justify-center">
+                        <i data-lucide="smile" class="w-4 h-4 text-white/20" id="moodIcon"></i>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Settings Panel -->
-        <div id="settingsPanel" class="fixed inset-0 bg-black z-50 p-6 flex flex-col">
-            <div class="flex justify-between items-center mb-10">
-                <h2 class="text-xl font-bold">Kustom Pengaturan</h2>
-                <button onclick="toggleSettings()" class="bg-white/10 p-2 rounded-full"><i data-lucide="x"></i></button>
+        <!-- AI Interaction Button -->
+        <div class="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-4">
+            <div id="scanPrompt" class="text-[10px] bg-black/60 px-4 py-1 rounded-full border border-white/10 text-white/60 mb-2">
+                TEKAN UNTUK ANALISIS DEEP AI
             </div>
+            <button id="mainBtn" onclick="runDeepAnalysis()" class="w-20 h-20 rounded-full border-4 border-[#FFB800] p-1 flex items-center justify-center transition-transform active:scale-90 shutter-glow">
+                <div id="btnInner" class="w-full h-full bg-[#FFB800] rounded-full flex items-center justify-center">
+                    <i data-lucide="scan-eye" class="w-8 h-8 text-black"></i>
+                </div>
+            </button>
+        </div>
 
-            <div class="space-y-6">
-                <div class="flex justify-between items-center p-4 bg-zinc-900 rounded-2xl">
+        <!-- Analysis Result Card -->
+        <div id="analysisCard" class="fixed bottom-0 left-0 w-full z-50 p-6">
+            <div class="bg-[#0A0A0A] border-t-2 border-[#FFB800] rounded-t-[32px] p-8 shadow-2xl">
+                <div class="flex justify-between items-start mb-6">
                     <div>
-                        <p class="font-medium">Kualitas Gambar</p>
-                        <p class="text-xs text-white/50">Ultra HD (V60 Optimization)</p>
+                        <h3 class="text-2xl font-bold">Deep AI Analysis</h3>
+                        <p class="text-xs text-white/40 tracking-wider">GENERATIVE INSIGHT ENGINE</p>
                     </div>
-                    <span class="text-yellow-500 font-bold">MAX</span>
+                    <button onclick="closeAnalysis()" class="text-white/40"><i data-lucide="x"></i></button>
                 </div>
 
-                <div class="flex justify-between items-center p-4 bg-zinc-900 rounded-2xl">
-                    <div>
-                        <p class="font-medium">Grid Lines</p>
-                        <p class="text-xs text-white/50">Membantu komposisi foto</p>
-                    </div>
-                    <div class="w-12 h-6 bg-zinc-700 rounded-full relative p-1">
-                        <div class="w-4 h-4 bg-white rounded-full"></div>
-                    </div>
+                <div id="analysisLoader" class="hidden flex flex-col items-center py-10">
+                    <div class="loading-spinner mb-4"></div>
+                    <p class="text-sm animate-pulse">Menghubungkan ke Neural Network...</p>
                 </div>
 
-                <div class="flex justify-between items-center p-4 bg-zinc-900 rounded-2xl">
-                    <div>
-                        <p class="font-medium">Suara Shutter</p>
-                        <p class="text-xs text-white/50">Efek suara kamera DSLR</p>
+                <div id="analysisContent" class="space-y-6">
+                    <!-- Dynamic Content will be injected here -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white/5 p-4 rounded-2xl">
+                            <p class="text-[10px] text-white/40">GENDER & AGE</p>
+                            <p id="resGender" class="font-bold text-lg">---</p>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-2xl">
+                            <p class="text-[10px] text-white/40">EMOTION STATE</p>
+                            <p id="resMood" class="font-bold text-lg text-[#FFB800]">---</p>
+                        </div>
                     </div>
-                    <div class="w-12 h-6 bg-yellow-500 rounded-full relative p-1 flex justify-end">
-                        <div class="w-4 h-4 bg-white rounded-full"></div>
+                    <div class="bg-white/5 p-4 rounded-2xl">
+                        <p class="text-[10px] text-white/40">SMART SUMMARY</p>
+                        <p id="resSummary" class="text-sm leading-relaxed text-white/80 mt-2 italic">Menunggu input visual untuk melakukan scanning...</p>
                     </div>
                 </div>
-
-                <div class="flex justify-between items-center p-4 bg-zinc-900 rounded-2xl">
-                    <div>
-                        <p class="font-medium">Pelacakan Telunjuk</p>
-                        <p class="text-xs text-white/50">Tracker otomatis di ujung jari</p>
-                    </div>
-                    <span class="text-xs text-green-500 font-bold uppercase">Selalu Aktif</span>
-                </div>
-            </div>
-
-            <div class="mt-auto text-center pb-6">
-                <p class="text-[10px] text-white/30 uppercase tracking-widest">Vivo V60 Pro Camera Engine v4.2</p>
             </div>
         </div>
 
-        <!-- Timer Overlay -->
-        <div id="timerDisplay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-8xl font-bold text-white hidden z-50 drop-shadow-lg"></div>
+        <!-- Sidebar Stream -->
+        <div class="absolute right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2">
+            <div class="w-1 h-32 bg-white/10 rounded-full relative">
+                <div id="streamIndicator" class="absolute top-0 left-0 w-full h-4 bg-[#FFB800] rounded-full"></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -325,228 +223,222 @@
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('overlay');
         const ctx = canvas.getContext('2d');
-        const zoomDial = document.getElementById('zoomDial');
-        const zoomLabel = document.getElementById('zoomLabel');
-        const fingerTracker = document.getElementById('fingerTracker');
-        
-        let currentStream;
-        let isFrontCamera = true;
-        let currentZoom = 1.0;
-        let gestureEnabled = false;
-        let hands;
-        let faceDetection;
+        const fingerCountEl = document.getElementById('fingerCount');
+        const handSideEl = document.getElementById('handSide');
+        const modelStatusEl = document.getElementById('modelStatus');
+        const scanLine = document.getElementById('scanLine');
+        const analysisCard = document.getElementById('analysisCard');
 
-        // Initialize Zoom Dial Ticks
-        function initZoomDial() {
-            // Create ticks for 1x to 100x
-            // Since 100x is huge, we use a non-linear or segmented scale
-            // Major points: 1x, 2x, 5x, 10x, 20x, 50x, 100x
-            const majors = [1, 2, 5, 10, 20, 50, 100];
-            for(let i=0; i<=100; i++) {
-                const tick = document.createElement('div');
-                tick.className = 'dial-tick';
-                if(majors.includes(i)) {
-                    tick.classList.add('major');
-                    tick.setAttribute('data-value', i + 'x');
-                }
-                zoomDial.appendChild(tick);
-            }
-        }
-
-        let startX, scrollLeft;
-        let isDragging = false;
-
-        document.getElementById('dialTouchArea').addEventListener('touchstart', (e) => {
-            isDragging = true;
-            startX = e.touches[0].pageX - zoomDial.offsetLeft;
-            scrollLeft = currentZoom; 
-        });
-
-        document.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            e.preventDefault();
-            const x = e.touches[0].pageX - zoomDial.offsetLeft;
-            const walk = (x - startX) * 0.1; // sensitivity
-            
-            let targetZoom = Math.max(1, Math.min(100, currentZoom - walk));
-            updateZoom(targetZoom);
-        });
-
-        document.addEventListener('touchend', () => isDragging = false);
-
-        // PC Compatibility
-        document.getElementById('dialTouchArea').addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startX = e.pageX - zoomDial.offsetLeft;
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const x = e.pageX - zoomDial.offsetLeft;
-            const walk = (x - startX) * 0.1;
-            updateZoom(Math.max(1, Math.min(100, currentZoom - walk)));
-        });
-        document.addEventListener('mouseup', () => isDragging = false);
-
-        function updateZoom(val) {
-            currentZoom = val;
-            zoomLabel.innerText = currentZoom.toFixed(1) + 'x';
-            
-            // Move the dial UI
-            // Offset logic: roughly -17px per tick
-            const offset = (currentZoom - 1) * -17;
-            zoomDial.style.transform = `translateX(${offset}px)`;
-            
-            // Apply zoom to video
-            const mirror = isFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
-            video.style.transform = `${mirror} scale(${1 + (currentZoom - 1) * 0.1})`; 
-            // Note: 100x digital zoom is clamped in actual css scale for usability
-        }
+        let hands, faceDetection;
+        let lastHandData = null;
+        let isAnalyzing = false;
 
         async function initCamera() {
-            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-            const constraints = { video: { facingMode: isFrontCamera ? 'user' : 'environment' } };
             try {
-                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = currentStream;
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: 1280, height: 720 } 
+                });
+                video.srcObject = stream;
                 video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     startTracking();
                 };
-            } catch (e) {
-                console.error(e);
+            } catch (err) {
+                modelStatusEl.innerText = "Error: Kamera tidak diizinkan";
+                modelStatusEl.style.color = "#ff4444";
             }
         }
 
         async function startTracking() {
+            modelStatusEl.innerText = "Loading AI Models...";
+            
+            // Hands Setup
+            hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.7
+            });
+            hands.onResults(onHandResults);
+
+            // Face Setup
             faceDetection = new FaceDetection({
                 locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
             });
             faceDetection.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
             faceDetection.onResults(onFaceResults);
 
-            hands = new Hands({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-            });
-            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6 });
-            hands.onResults(onHandResults);
-
-            processFrames();
+            modelStatusEl.innerText = "Engines Ready";
+            requestAnimationFrame(processFrame);
         }
 
-        async function processFrames() {
-            if (video.paused || video.ended) return;
-            await faceDetection.send({ image: video });
-            await hands.send({ image: video });
-            requestAnimationFrame(processFrames);
+        async function processFrame() {
+            if (!video.paused) {
+                await hands.send({ image: video });
+                await faceDetection.send({ image: video });
+            }
+            requestAnimationFrame(processFrame);
+        }
+
+        function onHandResults(results) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const handedness = results.multiHandedness[0].label; // 'Left' or 'Right'
+                
+                lastHandData = landmarks;
+                handSideEl.innerText = handedness === 'Left' ? 'TANGAN KIRI' : 'TANGAN KANAN';
+                
+                // Finger Counting Logic
+                let count = 0;
+                // Index, Middle, Ring, Pinky
+                const fingerTips = [8, 12, 16, 20];
+                const fingerBases = [6, 10, 14, 18];
+                
+                fingerTips.forEach((tip, idx) => {
+                    if (landmarks[tip].y < landmarks[fingerBases[idx]].y) count++;
+                });
+
+                // Thumb Logic (special case)
+                // Thumb is open if tip x is further from palm center than base x
+                const thumbTip = landmarks[4];
+                const thumbBase = landmarks[2];
+                if (handedness === 'Left') {
+                    if (thumbTip.x > thumbBase.x) count++;
+                } else {
+                    if (thumbTip.x < thumbBase.x) count++;
+                }
+
+                fingerCountEl.innerText = count;
+                document.getElementById('confidenceBar').style.width = (results.multiHandedness[0].score * 100) + '%';
+
+                // Draw Landmarks
+                drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: '#FFB800', lineWidth: 2 });
+                drawLandmarks(ctx, landmarks, { color: '#FFFFFF', lineWidth: 1, radius: 3 });
+                
+                // Smart Label for Hand
+                ctx.fillStyle = '#FFB800';
+                ctx.font = 'bold 20px JetBrains Mono';
+                ctx.fillText(`${handedness} Hand (${count} Fingers)`, landmarks[0].x * canvas.width, (landmarks[0].y * canvas.height) + 30);
+            } else {
+                fingerCountEl.innerText = "0";
+                handSideEl.innerText = "DETECTING...";
+                document.getElementById('confidenceBar').style.width = '0%';
+            }
         }
 
         function onFaceResults(results) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const faceStatus = document.getElementById('faceStatus');
+            const moodIcon = document.getElementById('moodIcon');
+
             if (results.detections.length > 0) {
+                faceStatus.innerText = "SUBJECT DETECTED";
+                faceStatus.className = "text-xs font-bold text-green-400";
+                moodIcon.classList.remove('text-white/20');
+                moodIcon.classList.add('text-[#FFB800]');
+
                 results.detections.forEach(det => {
                     const box = det.boundingBox;
                     const x = box.xCenter * canvas.width - (box.width * canvas.width) / 2;
                     const y = box.yCenter * canvas.height - (box.height * canvas.height) / 2;
                     const w = box.width * canvas.width;
                     const h = box.height * canvas.height;
-                    
+
                     ctx.strokeStyle = '#FFB800';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([10, 5]);
                     ctx.strokeRect(x, y, w, h);
                     ctx.setLineDash([]);
-                });
-            }
-        }
-
-        function onHandResults(results) {
-            let indexFingerFound = false;
-
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const hand = results.multiHandLandmarks[0];
-                
-                // Identify Index Finger Pointing Gesture
-                // Tip of index (8) must be higher than middle (12), ring (16) etc.
-                const isPointing = hand[8].y < hand[6].y && 
-                                  hand[12].y > hand[10].y && 
-                                  hand[16].y > hand[14].y;
-
-                if (isPointing) {
-                    indexFingerFound = true;
-                    // Mirroring logic
-                    const posX = isFrontCamera ? (1 - hand[8].x) * 100 : hand[8].x * 100;
-                    const posY = hand[8].y * 100;
                     
-                    fingerTracker.style.display = 'block';
-                    fingerTracker.style.left = posX + '%';
-                    fingerTracker.style.top = posY + '%';
-                }
-
-                // Palm Gesture for Capture
-                const isPalm = hand[8].y < hand[6].y && hand[12].y < hand[10].y && hand[4].y < hand[3].y;
-                if (isPalm && gestureEnabled && !window.isCapturing) {
-                    triggerCapture();
-                }
-            }
-
-            if (!indexFingerFound) {
-                fingerTracker.style.display = 'none';
+                    // Face Corners
+                    ctx.fillStyle = '#FFB800';
+                    ctx.fillRect(x, y, 10, 2); ctx.fillRect(x, y, 2, 10); // Top-left
+                    ctx.fillRect(x+w-10, y, 10, 2); ctx.fillRect(x+w-2, y, 2, 10); // Top-right
+                });
+            } else {
+                faceStatus.innerText = "NO SUBJECT";
+                faceStatus.className = "text-xs font-bold text-white/40";
+                moodIcon.classList.add('text-white/20');
             }
         }
 
-        // UI Handlers
+        async function runDeepAnalysis() {
+            if (isAnalyzing) return;
+            isAnalyzing = true;
+
+            // UI Feedback
+            scanLine.classList.add('animate-scan');
+            analysisCard.classList.add('show');
+            document.getElementById('analysisLoader').classList.remove('hidden');
+            document.getElementById('analysisContent').classList.add('hidden');
+
+            // Capture frame
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.drawImage(video, 0, 0);
+            const base64Image = tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+            try {
+                const prompt = "Analyze the person in this image. Identify: 1. Gender (Male/Female/Unclear), 2. Estimated Age, 3. Dominant Emotion, 4. A very brief 1-sentence description of their style or action. Return in JSON format: {gender, age, emotion, summary}";
+                
+                const apiKey = ""; // Canvas will provide
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                        ]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const aiData = JSON.parse(result.candidates[0].content.parts[0].text);
+
+                // Update UI
+                document.getElementById('resGender').innerText = `${aiData.gender}, ${aiData.age}`;
+                document.getElementById('resMood').innerText = aiData.emotion.toUpperCase();
+                document.getElementById('resSummary').innerText = `"${aiData.summary}"`;
+
+            } catch (err) {
+                document.getElementById('resSummary').innerText = "Gagal menghubungkan ke satelit AI. Pastikan pencahayaan cukup.";
+                console.error(err);
+            } finally {
+                setTimeout(() => {
+                    scanLine.classList.remove('animate-scan');
+                    document.getElementById('analysisLoader').classList.add('hidden');
+                    document.getElementById('analysisContent').classList.remove('hidden');
+                    isAnalyzing = false;
+                }, 1000);
+            }
+        }
+
+        function closeAnalysis() {
+            analysisCard.classList.remove('show');
+        }
+
         function toggleSettings() {
-            document.getElementById('settingsPanel').classList.toggle('open');
+            // Future logic for model adjustment
+            alert("Sistem AI terkalibrasi secara optimal untuk Vivo V60 Smart Engine.");
         }
 
-        function triggerCapture() {
-            window.isCapturing = true;
-            document.getElementById('flashOverlay').classList.add('animate-flash');
-            setTimeout(() => {
-                document.getElementById('flashOverlay').classList.remove('animate-flash');
-                window.isCapturing = false;
-            }, 500);
-
-            // Shutter animation
-            const inner = document.getElementById('shutterInner');
-            inner.style.transform = 'scale(0.8)';
-            setTimeout(() => inner.style.transform = 'scale(1)', 100);
-
-            // Mock saving photo
-            console.log("Photo Captured at " + currentZoom + "x zoom");
-        }
-
-        function switchCamera() {
-            isFrontCamera = !isFrontCamera;
-            updateZoom(1.0);
-            initCamera();
-        }
-
-        function toggleGesture() {
-            gestureEnabled = !gestureEnabled;
-            document.getElementById('gestureToggle').classList.toggle('text-[#FFB800]', gestureEnabled);
-        }
-
-        let timerSeconds = 0;
-        function cycleTimer() {
-            const list = [0, 3, 5, 10];
-            timerSeconds = list[(list.indexOf(timerSeconds) + 1) % list.length];
-            document.getElementById('timerVal').innerText = timerSeconds === 0 ? 'OFF' : timerSeconds + 'S';
-            document.getElementById('timerToggle').classList.toggle('text-yellow-500', timerSeconds > 0);
-        }
-
-        function setMode(mode) {
-            document.querySelectorAll('.mode-item').forEach(m => {
-                m.classList.remove('active');
-                if(m.innerText === mode) m.classList.add('active');
-            });
-        }
-
-        window.onload = () => {
-            initZoomDial();
-            initCamera();
-        };
+        // Initialize on load
+        window.onload = initCamera;
 
     </script>
 </body>
